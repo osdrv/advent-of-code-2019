@@ -146,7 +146,7 @@ func sortedPolarCoords(base Coord, asteroids []Coord) []RadialCoord {
 }
 
 func main() {
-	file, err := os.Open("INPUT")
+	file, err := os.Open("INPUT-TST2")
 	noerr(err)
 	defer file.Close()
 	field := ReadField(file)
