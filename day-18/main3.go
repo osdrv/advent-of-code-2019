@@ -64,37 +64,35 @@ func getAdjMatrix(input io.Reader) (map[vertex][]transit, vertex, uint32) {
 	for _, s := range ss {
 		bs = append(bs, []byte(s))
 	}
-	matrix := make(map[vertex][]transit)
+
 	q := make([]vertex, 0, 1)
 	var start vertex
 	var allKeys uint32
+
 	for y := 0; y < len(bs); y++ {
 		for x := 0; x < len(bs[y]); x++ {
 			ch := bs[y][x]
+			v := vertex{
+				ch:  ch,
+				pos: v2{x, y},
+			}
 			if isStart(ch) {
-				start = vertex{
-					ch:  ch,
-					pos: v2{x: x, y: y},
-				}
+				start = v
 			}
 			if isKey(ch) {
 				allKeys |= 1 << int(ch-'a')
 			}
 			if isSomething(ch) {
-				q = append(q, vertex{
-					ch:  ch,
-					pos: v2{x: x, y: y},
-				})
+				q = append(q, v)
 			}
 		}
 	}
 
-	log.Printf("all keys: %b", allKeys)
-
-	var p vertex
+	matrix := make(map[vertex][]transit)
+	var v vertex
 	for len(q) > 0 {
-		p, q = q[0], q[1:]
-		matrix[p] = calcTransits(bs, p)
+		v, q = q[0], q[1:]
+		matrix[v] = calcTransits(bs, v)
 	}
 
 	return matrix, start, allKeys
@@ -109,11 +107,11 @@ var (
 	}
 )
 
-func calcTransits(bs [][]byte, p vertex) []transit {
+func calcTransits(bs [][]byte, from vertex) []transit {
 	q := make([]transit, 0, 1)
 	ts := make([]transit, 0, 1)
 	q = append(q, transit{
-		v: p,
+		v: from,
 		k: 0,
 		l: 0,
 	})
@@ -125,7 +123,7 @@ func calcTransits(bs [][]byte, p vertex) []transit {
 		if isDoor(h.v.ch) {
 			h.k |= 1 << int(h.v.ch-'A')
 		}
-		if h.v != p && (isKey(h.v.ch)) {
+		if h.v != from && isKey(h.v.ch) {
 			ts = append(ts, h)
 		}
 		for _, s := range STEPS {
@@ -153,22 +151,6 @@ func calcTransits(bs [][]byte, p vertex) []transit {
 	return ts
 }
 
-func popcnt(v uint32) int {
-	res := 0
-	for v > 0 {
-		v &= v - 1
-	}
-	return res
-}
-
-func cmpTransit(i1, i2 interface{}) bool {
-	t1, t2 := i1.(transit), i2.(transit)
-	if t1.l == t2.l {
-		return popcnt(t1.k) > popcnt(t2.k)
-	}
-	return t1.l < t2.l
-}
-
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -181,7 +163,7 @@ type memoItem struct {
 	k uint32
 }
 
-func solve2(adj map[vertex][]transit, start vertex, allKeys uint32) int {
+func solve(adj map[vertex][]transit, start vertex, allKeys uint32) int {
 	var visit func(vertex, uint32, int) int
 	memo := make(map[memoItem]int)
 	minSoFar := 999999
@@ -212,13 +194,14 @@ func solve2(adj map[vertex][]transit, start vertex, allKeys uint32) int {
 
 		d := 999999
 		for _, tr := range adj[v] {
+			// this check guarantees the recursion depth won't exceed the amount
+			// of keys
 			if keys&(1<<int(tr.v.ch-'a')) > 0 {
-				//log.Printf("We already have the key for %c\n", tr.v.ch)
 				// we already have this key
 				continue
 			}
+			// do we have enough keys to transit?
 			if (keys & tr.k) == tr.k {
-				// we have enough keys to transit
 				if nd := visit(tr.v, keys, dist+tr.l); nd >= 0 {
 					d = min(d, nd)
 				}
@@ -236,6 +219,6 @@ func main() {
 
 	adj, start, allKeys := getAdjMatrix(file)
 	log.Printf("adjacency matrix: %+v", adj)
-	res := solve2(adj, start, allKeys)
+	res := solve(adj, start, allKeys)
 	log.Printf("Result is: %d", res)
 }
